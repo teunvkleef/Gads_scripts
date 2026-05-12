@@ -1,0 +1,69 @@
+/**
+ * Past Target ROAS procentueel aan (+/-)
+ * en rondt af op 5
+ * voor ingeschakelde Performance Max campagnes
+ * waarvan de naam begint met "pm".
+ */
+function main() {
+  var PREFIX = "pm";
+  var PERCENTAGE = -0.15; // +0.08 = +8%, -0.08 = -8%
+  var ROUND_TO = 5;
+  var DRY_RUN = false;
+
+  var it = AdsApp.performanceMaxCampaigns()
+    .withCondition("Status = ENABLED")
+    .withCondition("Name STARTS_WITH_IGNORE_CASE '" + PREFIX + "'")
+    .get();
+
+  var updated = 0;
+  var skipped = 0;
+
+  while (it.hasNext()) {
+    var campaign = it.next();
+    var bidding = campaign.bidding();
+
+    var currentTroas = bidding.getTargetRoas(); // bv 500 = 500%
+    if (currentTroas === null || currentTroas === undefined) {
+      skipped++;
+      Logger.log("SKIP (geen tROAS): %s", campaign.getName());
+      continue;
+    }
+
+    // procentuele aanpassing
+    var adjustedTroas = currentTroas * (1 + PERCENTAGE);
+
+    // afronden op 5
+    var newTroas = Math.round(adjustedTroas / ROUND_TO) * ROUND_TO;
+
+    // veiligheidsnet
+    if (newTroas <= 0) {
+      skipped++;
+      Logger.log(
+        "SKIP (tROAS zou <= 0 worden): %s (huidig: %s)",
+        campaign.getName(),
+        currentTroas
+      );
+      continue;
+    }
+
+    if (!DRY_RUN) {
+      bidding.setTargetRoas(newTroas);
+    }
+
+    updated++;
+    Logger.log(
+      "%s: tROAS %s → %s (%+d%%)%s",
+      campaign.getName(),
+      currentTroas,
+      newTroas,
+      PERCENTAGE * 100,
+      DRY_RUN ? " (DRY_RUN)" : ""
+    );
+  }
+
+  Logger.log(
+    "Klaar. Bijgewerkt: %s | Overgeslagen: %s",
+    updated,
+    skipped
+  );
+}
