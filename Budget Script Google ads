@@ -1,0 +1,61 @@
+/**
+ * Past budget procentueel aan (+/-)
+ * voor ingeschakelde Performance Max campagnes
+ * waarvan de naam begint met "pm".
+ */
+function main() {
+  var PREFIX = "pm";
+
+  var BUDGET_PERCENTAGE = 0.2; // +0.2 = +20%, -0.2 = -20%
+  var DRY_RUN = false;
+
+  var it = AdsApp.performanceMaxCampaigns()
+    .withCondition("Status = ENABLED")
+    .withCondition("Name STARTS_WITH_IGNORE_CASE '" + PREFIX + "'")
+    .get();
+
+  var updated = 0;
+  var skipped = 0;
+
+  while (it.hasNext()) {
+    var campaign = it.next();
+    var budget = campaign.getBudget();
+
+    var currentBudget = budget.getAmount();
+    var newBudget = currentBudget * (1 + BUDGET_PERCENTAGE);
+
+    // veiligheidsnet
+    if (newBudget <= 0) {
+      skipped++;
+
+      Logger.log(
+        "SKIP budget (zou <= 0 worden): %s (huidig: %s)",
+        campaign.getName(),
+        currentBudget
+      );
+
+      continue;
+    }
+
+    if (!DRY_RUN) {
+      budget.setAmount(newBudget);
+    }
+
+    updated++;
+
+    Logger.log(
+      "%s: budget %s → %s (%+d%%)%s",
+      campaign.getName(),
+      currentBudget,
+      newBudget,
+      BUDGET_PERCENTAGE * 100,
+      DRY_RUN ? " (DRY_RUN)" : ""
+    );
+  }
+
+  Logger.log(
+    "Klaar. Bijgewerkt: %s | Overgeslagen: %s",
+    updated,
+    skipped
+  );
+}
